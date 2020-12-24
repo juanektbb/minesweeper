@@ -1,129 +1,35 @@
 import java.util.Random;
 
-import java.awt.event.*; 
 import java.awt.*; 
 import javax.swing.*; 
-
-class Cell{
-
-	int x;
-	int y;
-	JButton button;
-
-	Boolean isMine;
-	int cell_value;
-
-    Boolean revealed;
-    String content_hidden;
-
-	Cell(int x, int y){
-		this.x = x;
-		this.y = y;
-        this.isMine = false;
-		this.cell_value = 0;
-        this.revealed = false;	
-	}
-
-	public void increment_cell_value(){
-		this.cell_value += 1;
-	}
-
-    public void setThisMine(){
-        this.isMine = true;
-    }
-
-
-
-	public JButton drawButton(){
-
-
-		if(this.isMine){
-			this.content_hidden = "M";
-		}else{
-            if(this.cell_value > 0)
-                this.content_hidden = String.valueOf(cell_value);
-            else
-                this.content_hidden = "";
-        }
-
-
-
-
-		button = new JButton("");
-		button.setBounds(this.x * 30, this.y * 30, 30, 30); 
-
-        return button;
-	}
-
-    public void revealContent(JPanel p, JFrame f){
-
-        this.revealed = true;
-        this.button.setVisible(false);
-
-
-        JLabel label = new JLabel(this.content_hidden, SwingConstants.CENTER);
-
-        label.setFont(new Font("Serif", Font.PLAIN, 18));
-
-
-        p.add(label);
-        Dimension size = label.getPreferredSize();
-
-        label.setBounds(this.x * 30, this.y * 30, 30, 30);
-
-        if(this.isMine){
-            label.setForeground(Color.RED);
-        }else if(this.cell_value == 1){
-            label.setForeground(Color.BLUE);
-        }else if(this.cell_value == 2){
-            label.setForeground(Color.GREEN);
-        }else if(this.cell_value == 3){
-            label.setForeground(Color.RED);
-        }else if(this.cell_value == 4){
-            label.setForeground(Color.ORANGE);
-        }else if(this.cell_value == 0){
-            label.setForeground(Color.BLACK);
-        }
-
-        label.setBackground(Color.GRAY);
-        label.setOpaque(true);
-
-
-        label.setBorder(BorderFactory.createLineBorder(Color.BLACK, 1));
-
-        label.setHorizontalAlignment(SwingConstants.CENTER);
-        label.setVerticalAlignment(SwingConstants.CENTER);
-
-    
- 
-    }
-
-
-
-}
-
-
+import java.awt.event.*; 
 
 class Minesweeper extends JFrame{
 
 	static JFrame f; 
-    static JPanel p; 
-    static JLabel l; 
-
-    Random random = new Random();
+    static JPanel p;
+    static JLabel gameMsg; 
+     
     Cell cells[][];
+    Random random = new Random();
 
     int rows;
     int cols;
     int mines;
 
+    int counter_valid_cells;
 
     Minesweeper(int rows, int cols, int mines){
-
         this.rows = rows;
         this.cols = cols;
         this.mines = mines;
+        this.counter_valid_cells = rows * cols - mines;
         this.cells = new Cell[rows][cols];
+    }
+
+    //Update the live cells counter
+    public void update_counter_valid_cells(){
+        this.counter_valid_cells -= 1;
     }
 
 
@@ -132,7 +38,7 @@ class Minesweeper extends JFrame{
     	return this.random.nextInt(max_int);
     }
 
-    //Create game cells
+    //CREATE GAME CELLS
     public void createAllCells(){
         for(int x = 0; x < this.rows; x++){
             for(int y = 0; y < this.cols; y++){
@@ -142,7 +48,7 @@ class Minesweeper extends JFrame{
         }
     }
 
-    //
+    //CREATE GAME MINES
     public void createMines(){
     	for(int i = 0; i < this.mines; i++){
 
@@ -157,51 +63,76 @@ class Minesweeper extends JFrame{
 
             //Make it mine and to add values to its neighbors
             this.cells[rand_x][rand_y].setThisMine();
-            this.createCellValues(rand_x, rand_y);
+            this.numberMineNeighbors(rand_x, rand_y);
 
     	}
     }
 
-
-    //THE USER LOST - REVEAL ALL CELLS
-    final void revealAllCells(){
+    //USER LOST - REVEAL ALL CELLS
+    final void revealToLose(){
         for(int x = 0; x < this.rows; x++){
             for(int y = 0; y < this.cols; y++){
-                this.cells[x][y].revealContent(p, f);
+                this.cells[x][y].revealContent(p, f, false);
             }
         }
     }
 
+    //USER WON - REVEAL ALL MINES AS WIN
+    final void revealToWin(){
+        for(int x = 0; x < this.rows; x++){
+            for(int y = 0; y < this.cols; y++){
+                if(this.cells[x][y].isMine){
+                    this.cells[x][y].revealToWin(p);
+                }
+            }
+        }  
+    }
 
-    //
+    //CREATE LISTENER BUTTON OF EACH CELL
     public void createListener(JButton button, Cell cell){
         button.addActionListener(
-            new ActionListener() { 
+            new ActionListener(){ 
+
+                @Override
                 public void actionPerformed(ActionEvent e){ 
-
-
                     
-                    //User just lost
+                    //User lost the game
                     if(cell.isMine){
-                        System.out.println("YOU LOST");
-                        revealAllCells();
+                        cell.revealContent(p, f, true);
+                        revealToLose();
 
+                        gameMsg.setText("Damn, you touched a mine and exploded!");
+                        gameMsg.setForeground(new Color(255, 100, 100));
+                        return;
 
+                    //User clicked on 0, recursion time
                     }else if(cell.cell_value == 0){
                         revealThisEmpty(cell);
+
+                    //User clicked on a number
                     }else{
-                        cell.revealContent(p, f);
-
-
+                        cell.revealContent(p, f, false);
+                        update_counter_valid_cells();
                     }
+
+                    //User won the game
+                    if(counter_valid_cells == 0){
+                        revealToWin();
+
+                        gameMsg.setText("Congratulations, you won this game!");
+                        gameMsg.setForeground(new Color(70, 170, 60));
+                        return;
+                    }
+
+                    gameMsg.setText("You have " +  counter_valid_cells + (counter_valid_cells == 1 ? " cell left" : " cells left"));
+                
                 } 
+
             } 
         ); 
     }
 
-
-
-
+    //RECURSIVE REVEALING FOR EMPTY CELLS
     public void revealThisEmpty(Cell cell){
 
         //There is row above
@@ -220,47 +151,39 @@ class Minesweeper extends JFrame{
         for(int row = on_row_start; row <= on_row_end; row++){
             for(int column = on_column_start; column <= on_column_end; column++){
 
-                //This is not a mine to reveal
+                //This is not a mine, so it can be revealed
                 if(!this.cells[column][row].isMine){
 
-                    //Skip this value is the mine
-                    if(row == cell.y && column == cell.x){
-                        if(!cell.revealed)
-                            cell.revealContent(p, f);
-                        continue;
-                    }
-                    
-                    //
+                    //This hasn't been revealed yet    
                     if(!this.cells[column][row].revealed){
-                    
-                        //This cell is another empty
-                        if(this.cells[column][row].cell_value == 0){
+
+                        //This is the actual cell being checked
+                        if(row == cell.y && column == cell.x){
+                            cell.revealContent(p, f, false);
+                            update_counter_valid_cells();
+                        
+                        //This cell is another empty, recursive it
+                        }else if(this.cells[column][row].cell_value == 0){
                             revealThisEmpty(this.cells[column][row]);
-                            
+
+                        //This is a number cell, only reveal it
                         }else if(this.cells[column][row].cell_value > 0){
-                            this.cells[column][row].revealContent(p, f);
+                            this.cells[column][row].revealContent(p, f, false);
+                            update_counter_valid_cells();
 
                         }
+
                     }
-
-
                 
                 }
 
             }
         }
 
-        
-
     }
 
-
-
-
-
-
-
-    public void createCellValues(int mine_x, int mine_y){
+    //INCREMENT THE CELL VALUE OF ALL MINE'S NEIGHBORS
+    public void numberMineNeighbors(int mine_x, int mine_y){
 
         //There is row above
         int on_row_start = (mine_y - 1 >= 0) ? mine_y - 1 : mine_y;
@@ -274,19 +197,15 @@ class Minesweeper extends JFrame{
         //There is column in the righ
         int on_column_end = (mine_x + 1 < this.rows) ? mine_x + 1 : mine_x;
 
-
-
-
-
 		//Loop allow rows and then loop allow columns
 		for(int row = on_row_start; row <= on_row_end; row++){
     		for(int column = on_column_start; column <= on_column_end; column++){
 
-    			//Skip this value is the mine
+    			//Skip, this is the mine
 				if(row == mine_y && column == mine_x)
 					continue;
 
-				//Skip this value is another mine
+				//Skip, this is another mine
 				if(this.cells[column][row].isMine)
 					continue;
 
@@ -297,9 +216,7 @@ class Minesweeper extends JFrame{
 
     }
 
-
-
-
+    //METHOD TO CREATE THE GAME
     public void createdWindows(){
 
     	f = new JFrame("Minesweeper"); 
@@ -308,43 +225,79 @@ class Minesweeper extends JFrame{
         p = (JPanel) f.getContentPane();
         p.setLayout(null);
 
-    	// 
-    	this.createAllCells();
-        this.createMines();
+        this.createBoard();
 
-    	 for(int x = 0; x < this.rows; x++){
-    		for(int y = 0; y < this.cols; y++){
-
-    			JButton button = this.cells[x][y].drawButton();
-    			f.add(this.cells[x][y].button);
-                this.createListener(button, this.cells[x][y]);
-    		}
-    	}
-
-    	
-		f.setSize(this.rows * 30, this.cols * 30 + 20);
-		f.setLayout(null);
-		f.setVisible(true);
+        f.setSize(this.rows * 30, this.cols * 30 + 52);
+        f.setLayout(null);
+        f.setVisible(true);
 
     }
 
-    
+    //METHOD TO GENERATE GAME ELEMENTS
+    public void createBoard(){
 
+        this.createAllCells();
+        this.createMines();
 
+         for(int x = 0; x < this.rows; x++){
+            for(int y = 0; y < this.cols; y++){
+                JButton button = this.cells[x][y].drawButton();
+                f.add(this.cells[x][y].button);
+                this.createListener(button, this.cells[x][y]);
+            }
+        }
 
+        this.setTextGameMsg();
 
+    }
 
+    //SET GAME TITLE
+    public void setTextGameMsg(){
+        gameMsg = new JLabel("You have " + this.counter_valid_cells + " cells left");
+        gameMsg.setFont(new Font("Dialog", Font.BOLD, 16));
+        gameMsg.setForeground(Color.BLACK);
+        gameMsg.setBackground(new Color(246, 246, 246));
 
+        p.add(gameMsg); 
+
+        gameMsg.setBounds(0, 0, this.rows * 30, 30);
+        gameMsg.setVerticalAlignment(SwingConstants.CENTER);
+        gameMsg.setHorizontalAlignment(SwingConstants.CENTER);
+        gameMsg.setOpaque(true);       
+    }
+
+    //MAIN TO START GAME
 	public static void main(String[] args){
 
-        int mines = 100;
+        if(args.length != 3){
+            System.out.println("You need to run 3 integer arguments [rows, columns, mines], for example:");
+            System.out.println("java Minesweeper 30 20 30");
 
-		Minesweeper minesweeper = new Minesweeper(50, 30, mines);
-		minesweeper.createdWindows();
-		
+        }else{
+            int rows =  Integer.parseInt(args[0]);
+            int cols = Integer.parseInt(args[1]);
+            int mines = Integer.parseInt(args[2]);
 
+            if(rows > 45){
+                System.out.println("The limit of rows is 45");
 
-		System.out.println("Minesweeper welcome!"); 
+            }else if(cols > 25){
+                System.out.println("The limit is columns is 25");
+
+            }else if(rows * cols <= mines){   
+                System.out.println("You have " + (rows * cols) + " cells and " + mines + " mines");
+                System.out.println("It is imposible to win this game");
+
+            }else{
+                Minesweeper minesweeper = new Minesweeper(rows, cols, mines);
+                minesweeper.createdWindows();
+	
+                System.out.println("Minesweeper is running!"); 
+
+            }
+
+        }
+
 	}
 
 }
